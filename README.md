@@ -100,6 +100,22 @@ Stop containers and permanently remove both PostgreSQL volumes:
 docker compose down -v
 ```
 
+## Docker image CI/CD
+
+The GitHub Actions workflow in `.github/workflows/docker-image.yml` builds and
+pushes the image after a commit is merged or pushed to `main`.
+
+Configure these repository secrets under **Settings → Secrets and variables →
+Actions**:
+
+- `DOCKERHUB_USERNAME`: Docker Hub username
+- `DOCKERHUB_TOKEN`: Docker Hub access token with read/write permission
+
+The workflow publishes these tags:
+
+- `<DOCKERHUB_USERNAME>/konga-oss:latest`
+- `<DOCKERHUB_USERNAME>/konga-oss:sha-<full-commit-sha>`
+
 ## Configuration
 
 The `konga-oss` service uses these environment variables:
