@@ -12,7 +12,7 @@ const authTab = ref<'default' | 'key_auth' | 'jwt' | 'basic_auth'>('default')
 
 const form = reactive({
   name: '',
-  kongAdminUrl: 'http://host.docker.internal:18001',
+  kongAdminUrl: 'http://kong:8001',
   apiKey: '',
   username: '',
   password: '',
