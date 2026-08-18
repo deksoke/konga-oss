@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - README.md
+      - screenshots/**
+      - docs/**
+      - "**/*.md"
 
 concurrency:
   group: docker-image-${{ github.ref }}

@@ -9,6 +9,20 @@ Nuxt 3 full-stack replacement for classic Konga (Sails + AngularJS).
 - Allowlisted Kong Admin proxy
 - Management UI for services, routes, consumers, plugins, certificates, upstreams, snapshots, and more
 
+## Screenshots
+
+### Dashboard
+
+![Konga OSS dashboard](screenshots/dashboard.jpg)
+
+### Plugin management
+
+![Konga OSS plugin management](screenshots/plugins.jpg)
+
+### Settings
+
+![Konga OSS settings](screenshots/settings.jpg)
+
 ## Run with Docker Compose
 
 ### Requirements
