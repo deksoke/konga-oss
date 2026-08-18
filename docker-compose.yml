@@ -1,0 +1,99 @@
+networks:
+  kong-net:
+
+volumes:
+  kong-database-data:
+  konga-database-data:
+
+services:
+  kong-database:
+    image: postgres:15.0
+    restart: always
+    volumes:
+      - kong-database-data:/var/lib/postgresql/data
+    networks:
+      - kong-net
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_DB: kong
+      POSTGRES_PASSWORD: kong
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  kong-migration:
+    image: kong/kong:3.9.3
+    command: "kong migrations bootstrap"
+    networks:
+      - kong-net
+    restart: on-failure
+    environment:
+      KONG_PG_HOST: kong-database
+      KONG_PG_PASSWORD: kong
+    depends_on:
+      kong-database:
+        condition: service_healthy
+
+  kong:
+    image: kong/kong:3.9.3
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      KONG_PG_HOST: kong-database
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_PROXY_LISTEN_SSL: 0.0.0.0:8443
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    depends_on:
+      kong-database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://kong:8001"]
+      interval: 5s
+      timeout: 2s
+      retries: 15
+    ports:
+      - "8001:8001"
+
+  konga-database:
+    image: postgres:15.0
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      POSTGRES_USER: konga
+      POSTGRES_DB: konga
+      POSTGRES_PASSWORD: konga
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "konga"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - konga-database-data:/var/lib/postgresql/data
+
+  konga-oss:
+    image: deksoke/konga-oss:latest
+    restart: always
+    ports:
+      - "1337:1337"
+    environment:
+      - COOKIE_SECURE=false
+      - KONGA_ALLOW_PRIVATE_ADMIN_URL=true
+      - NUXT_SESSION_PASSWORD=m9J1dqIBQKZLy6M5T7lf1n8WcQkXre4cec
+      - NODE_CREDENTIALS_KEY=vgzsGpLFoSfuWzsC6SBmFw0RbVgya7N5UWN4zzk80odK
+      - DATABASE_URL=postgresql://konga:konga@konga-database:5432/konga
+    networks:
+      - kong-net
+    depends_on:
+      - konga-database
+      - kong-migration
+      - kong
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://konga-oss:1337"]
+      interval: 30s
+      timeout: 2s
+      retries: 15

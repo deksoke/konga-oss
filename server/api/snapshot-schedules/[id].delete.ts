@@ -1,0 +1,18 @@
+import { prisma } from '../../utils/prisma'
+import { requireAdmin } from '../../utils/session'
+
+export default defineEventHandler(async (event) => {
+  await requireAdmin(event)
+  const id = getRouterParam(event, 'id')
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Missing id' })
+
+  try {
+    await prisma.snapshotSchedule.delete({ where: { id } })
+    return { ok: true }
+  } catch (err: any) {
+    if (err?.code === 'P2025') {
+      throw createError({ statusCode: 404, statusMessage: 'Schedule not found' })
+    }
+    throw err
+  }
+})

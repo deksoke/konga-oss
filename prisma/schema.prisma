@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  user
+}
+
+enum ThemePreference {
+  day
+  night
+  auto
+}
+
+enum KongAuthType {
+  default
+  key_auth
+  jwt
+  basic_auth
+}
+
+model User {
+  id           String          @id @default(cuid())
+  username     String          @unique
+  email        String          @unique
+  passwordHash String
+  firstName    String          @default("")
+  lastName     String          @default("")
+  role         Role            @default(user)
+  active       Boolean         @default(true)
+  theme        ThemePreference @default(auto)
+  activeNodeId String?
+  activeNode   KongNode?       @relation(fields: [activeNodeId], references: [id], onDelete: SetNull)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model KongNode {
+  id                 String             @id @default(cuid())
+  name               String
+  kongAdminUrl       String
+  authType           KongAuthType       @default(default)
+  credentialsEnc     String             @default("")
+  healthChecks       Boolean            @default(false)
+  healthCheckDetails Json?
+  users              User[]
+  snapshotSchedules  SnapshotSchedule[]
+  upstreamAlerts     UpstreamAlert[]
+  serviceExtras      KongServiceExtra[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model KongServiceExtra {
+  id           String   @id @default(cuid())
+  connectionId String
+  serviceId    String
+  description  String   @default("")
+  connection   KongNode @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([connectionId, serviceId])
+  @@index([connectionId])
+}
+
+model Snapshot {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  kongNodeName String
+  kongNodeUrl  String
+  kongVersion  String   @default("")
+  data         Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SnapshotSchedule {
+  id           String    @id @default(cuid())
+  cron         String
+  active       Boolean   @default(true)
+  lastRunAt    DateTime?
+  connectionId String
+  connection   KongNode  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model UpstreamAlert {
+  id           String   @id @default(cuid())
+  upstreamId   String
+  connectionId String
+  connection   KongNode @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  active       Boolean  @default(false)
+  email        Boolean  @default(false)
+  slack        Boolean  @default(true)
+  discord      Boolean  @default(true)
+  data         Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([upstreamId, connectionId])
+}
+
+model AppSettings {
+  id        String   @id @default("default")
+  data      Json
+  updatedAt DateTime @updatedAt
+}

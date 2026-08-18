@@ -1,0 +1,35 @@
+{
+  "name": "konga-nuxt",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 1337",
+    "build": "nuxt build",
+    "preview": "nuxt preview --port 1337",
+    "start": "node .output/server/index.mjs",
+    "postinstall": "nuxt prepare",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.8",
+    "nodemailer": "^9.0.4",
+    "nuxt": "3.15.4",
+    "ofetch": "^1.5.1",
+    "prisma": "^6.19.3",
+    "vue": "^3.5.13",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/nodemailer": "^8.0.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
