@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import facebookIcon from '~/assets/images/social-logins/facebook.png'
-import githubIcon from '~/assets/images/social-logins/github.png'
-import gitlabIcon from '~/assets/images/social-logins/gitlab.png'
-import googleIcon from '~/assets/images/social-logins/google.png'
-import lineIcon from '~/assets/images/social-logins/line.png'
+import type { OAuthProviderId } from '~/types/settings'
 
 definePageMeta({ layout: 'default' })
 
@@ -20,16 +16,23 @@ type AppUser = {
   updatedAt: string
 }
 
-const { user: authUser, refresh } = useAuth()
+const OAUTH_IDS = ['google', 'facebook', 'line', 'github', 'gitlab'] as const satisfies readonly OAuthProviderId[]
 
-const profile = ref<AppUser | null>(null)
-const error = ref('')
-const savingProfile = ref(false)
-const savingPassword = ref(false)
-const oauthLinked = reactive({ google: false, facebook: false, line: false, github: false, gitlab: false })
-const oauthBusy = ref<string | null>(null)
-const oauthEnabled = reactive({ google: false, facebook: false, line: false, github: false, gitlab: false })
-const oauthLoading = ref(false)
+const emptyOAuthFlags = (): Record<OAuthProviderId, boolean> => ({
+  google: false,
+  facebook: false,
+  line: false,
+  github: false,
+  gitlab: false
+})
+
+function oauthFlagsFrom(source: Record<string, unknown> | undefined, pick: (value: unknown) => boolean) {
+  const next = emptyOAuthFlags()
+  for (const id of OAUTH_IDS) {
+    next[id] = pick(source?.[id])
+  }
+  return next
+}
 
 const oauthErrors: Record<string, string> = {
   not_configured: 'Social login is not configured.',
@@ -40,14 +43,13 @@ const oauthErrors: Record<string, string> = {
   login_required: 'Sign in first to link a social account.'
 }
 
-const oauthMeta = {
-  google: { name: 'Google', icon: googleIcon },
-  facebook: { name: 'Facebook', icon: facebookIcon },
-  line: { name: 'LINE', icon: lineIcon },
-  github: { name: 'GitHub', icon: githubIcon },
-  gitlab: { name: 'GitLab', icon: gitlabIcon }
-} as const
-const oauthIds = ['google', 'facebook', 'line', 'github', 'gitlab'] as const
+const oauthNames: Record<OAuthProviderId, string> = {
+  google: 'Google',
+  facebook: 'Facebook',
+  line: 'LINE',
+  github: 'GitHub',
+  gitlab: 'GitLab'
+}
 
 const TABS = [
   { id: 'account', label: 'Account' },
@@ -57,14 +59,25 @@ const TABS = [
 
 type ProfileTab = (typeof TABS)[number]['id']
 
+const { user: authUser, refresh } = useAuth()
 const route = useRoute()
+const notify = useNotify()
+
+const profile = ref<AppUser | null>(null)
+const error = ref('')
+const savingProfile = ref(false)
+const savingPassword = ref(false)
+const oauthLinked = reactive(emptyOAuthFlags())
+const oauthEnabled = reactive(emptyOAuthFlags())
+const oauthBusy = ref<OAuthProviderId | null>(null)
+const oauthLoading = ref(false)
 
 const tab = computed<ProfileTab>(() => {
   const q = String(route.query.tab || 'account')
   return TABS.some((item) => item.id === q) ? (q as ProfileTab) : 'account'
 })
 
-const readyOAuthIds = computed(() => oauthIds.filter((id) => oauthEnabled[id]))
+const readyOAuthIds = computed(() => OAUTH_IDS.filter((id) => oauthEnabled[id]))
 
 const profileForm = reactive({
   username: '',
@@ -116,11 +129,11 @@ async function saveProfile() {
     })
     profile.value = res.data
     await refresh()
-    useNotify().success('Profile saved')
+    notify.success('Profile saved')
   } catch (e: any) {
     const msg = e?.data?.statusMessage || 'Failed to save profile'
     error.value = msg
-    useNotify().error(msg)
+    notify.error(msg)
   } finally {
     savingProfile.value = false
   }
@@ -128,11 +141,11 @@ async function saveProfile() {
 
 async function changePassword() {
   if (!passwordForm.password || !passwordForm.current_password) {
-    useNotify().error('Fill in all password fields')
+    notify.error('Fill in all password fields')
     return
   }
   if (passwordForm.password !== passwordForm.password_confirmation) {
-    useNotify().error('New passwords do not match')
+    notify.error('New passwords do not match')
     return
   }
   savingPassword.value = true
@@ -146,9 +159,9 @@ async function changePassword() {
       password: '',
       password_confirmation: ''
     })
-    useNotify().success('Password changed')
+    notify.success('Password changed')
   } catch (e: any) {
-    useNotify().error(e?.data?.statusMessage || 'Failed to change password')
+    notify.error(e?.data?.statusMessage || 'Failed to change password')
   } finally {
     savingPassword.value = false
   }
@@ -160,26 +173,19 @@ async function loadOAuth() {
     const pub = await $fetch<{
       data: { oauth_providers?: Record<string, { enabled?: boolean }> }
     }>('/api/settings/public')
-    const providers = pub.data?.oauth_providers || {}
-    Object.assign(oauthEnabled, {
-      google: Boolean(providers.google?.enabled),
-      facebook: Boolean(providers.facebook?.enabled),
-      line: Boolean(providers.line?.enabled),
-      github: Boolean(providers.github?.enabled),
-      gitlab: Boolean(providers.gitlab?.enabled)
-    })
+    Object.assign(
+      oauthEnabled,
+      oauthFlagsFrom(pub.data?.oauth_providers, (value) => Boolean((value as { enabled?: boolean } | undefined)?.enabled))
+    )
   } catch {
     // keep previous provider flags
   }
   try {
     const accounts = await $fetch<{ linked: Record<string, boolean> }>('/api/auth/oauth/accounts')
-    Object.assign(oauthLinked, {
-      google: Boolean(accounts.linked?.google),
-      facebook: Boolean(accounts.linked?.facebook),
-      line: Boolean(accounts.linked?.line),
-      github: Boolean(accounts.linked?.github),
-      gitlab: Boolean(accounts.linked?.gitlab)
-    })
+    Object.assign(
+      oauthLinked,
+      oauthFlagsFrom(accounts.linked, (value) => Boolean(value))
+    )
   } catch {
     // keep previous linked flags
   } finally {
@@ -187,42 +193,50 @@ async function loadOAuth() {
   }
 }
 
-async function unlinkOAuth(id: (typeof oauthIds)[number]) {
+async function unlinkOAuth(id: OAuthProviderId) {
   oauthBusy.value = id
   try {
     await $fetch(`/api/auth/oauth/${id}`, { method: 'DELETE' })
     oauthLinked[id] = false
-    useNotify().success(`${oauthMeta[id].name} unlinked`)
+    notify.success(`${oauthNames[id]} unlinked`)
   } catch (e: any) {
-    useNotify().error(e?.data?.statusMessage || `Failed to unlink ${oauthMeta[id].name}`)
+    notify.error(e?.data?.statusMessage || `Failed to unlink ${oauthNames[id]}`)
   } finally {
     oauthBusy.value = null
+  }
+}
+
+function applyOAuthQueryFeedback() {
+  const code = route.query.oauth_error
+  if (typeof code === 'string' && oauthErrors[code]) {
+    error.value = oauthErrors[code]
+    notify.error(oauthErrors[code])
+  }
+  if (route.query.oauth === 'linked') {
+    notify.success('Social account linked')
   }
 }
 
 onMounted(() => {
   load()
   loadOAuth()
-  const code = route.query.oauth_error
-  if (typeof code === 'string' && oauthErrors[code]) {
-    error.value = oauthErrors[code]
-    useNotify().error(oauthErrors[code])
-  }
-  if (route.query.oauth === 'linked') {
-    useNotify().success('Social account linked')
-  }
+  applyOAuthQueryFeedback()
 })
-watch(() => authUser.value?.id, () => {
-  load()
-  loadOAuth()
-})
+
+watch(
+  () => authUser.value?.id,
+  () => {
+    load()
+    loadOAuth()
+  }
+)
 </script>
 
 <template>
   <div class="profile-page">
     <div class="profile-header">
-      <h1 style="margin: 0">My profile</h1>
-      <p class="muted" style="margin: 0.5rem 0 0">Update your account details and password.</p>
+      <h1 class="page-title">My profile</h1>
+      <p class="muted page-lead">Update your account details and password.</p>
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>
@@ -241,114 +255,28 @@ watch(() => authUser.value?.id, () => {
       </nav>
 
       <div class="profile-pane stack">
-        <form v-if="tab === 'account'" class="stack" @submit.prevent="saveProfile">
-          <h2 style="margin: 0; font-size: 1.1rem">Account</h2>
-          <div>
-            <label class="label">Username</label>
-            <input v-model="profileForm.username" class="input" required minlength="3" autocomplete="username" />
-          </div>
-          <div class="row" style="gap: 0.75rem">
-            <div style="flex: 1">
-              <label class="label">First name</label>
-              <input v-model="profileForm.firstName" class="input" autocomplete="given-name" />
-            </div>
-            <div style="flex: 1">
-              <label class="label">Last name</label>
-              <input v-model="profileForm.lastName" class="input" autocomplete="family-name" />
-            </div>
-          </div>
-          <div>
-            <label class="label">Email</label>
-            <input v-model="profileForm.email" class="input" type="email" required autocomplete="email" />
-          </div>
-          <div class="muted" style="font-size: 0.9rem">
-            Role: {{ profile.admin ? 'Administrator' : 'User' }}
-            · Status: {{ profile.active ? 'Active' : 'Inactive' }}
-          </div>
-          <div>
-            <button class="btn btn-primary" type="submit" :disabled="savingProfile">
-              {{ savingProfile ? 'Saving…' : 'Save profile' }}
-            </button>
-          </div>
-        </form>
-
-        <form v-else-if="tab === 'password'" class="stack" @submit.prevent="changePassword">
-          <h2 style="margin: 0; font-size: 1.1rem">Change password</h2>
-          <div>
-            <label class="label">Current password</label>
-            <input
-              v-model="passwordForm.current_password"
-              class="input"
-              type="password"
-              required
-              autocomplete="current-password"
-            />
-          </div>
-          <div>
-            <label class="label">New password</label>
-            <input
-              v-model="passwordForm.password"
-              class="input"
-              type="password"
-              required
-              minlength="8"
-              autocomplete="new-password"
-            />
-          </div>
-          <div>
-            <label class="label">Confirm new password</label>
-            <input
-              v-model="passwordForm.password_confirmation"
-              class="input"
-              type="password"
-              required
-              minlength="8"
-              autocomplete="new-password"
-            />
-          </div>
-          <div>
-            <button class="btn btn-primary" type="submit" :disabled="savingPassword">
-              {{ savingPassword ? 'Updating…' : 'Change password' }}
-            </button>
-          </div>
-        </form>
-
-        <div v-else-if="tab === 'linked'" class="stack">
-          <h2 style="margin: 0; font-size: 1.1rem">Linked accounts</h2>
-          <p class="muted" style="margin: 0">
-            Connect a social login to this local user. You can still sign in with your password.
-          </p>
-          <p v-if="oauthLoading" class="muted" style="margin: 0">Loading social accounts…</p>
-          <template v-else-if="readyOAuthIds.length">
-            <div
-              v-for="id in readyOAuthIds"
-              :key="id"
-              class="row"
-              style="justify-content: space-between; align-items: center; gap: 0.75rem"
-            >
-              <span class="oauth-name">
-                <img :src="oauthMeta[id].icon" :alt="oauthMeta[id].name" class="oauth-icon" width="24" height="24" />
-                {{ oauthMeta[id].name }} — {{ oauthLinked[id] ? 'Linked' : 'Not linked' }}
-              </span>
-              <a v-if="!oauthLinked[id]" class="btn" :href="`/api/auth/oauth/${id}/start?intent=link`">
-                Link {{ oauthMeta[id].name }}
-              </a>
-              <button
-                v-else
-                class="btn"
-                type="button"
-                :disabled="oauthBusy === id"
-                @click="unlinkOAuth(id)"
-              >
-                {{ oauthBusy === id ? 'Unlinking…' : 'Unlink' }}
-              </button>
-            </div>
-          </template>
-          <p v-else class="muted" style="margin: 0">
-            No social login providers are ready to use. Enable a provider in Settings and save its client ID and
-            secret.
-          </p>
-        </div>
+        <ProfileAccountSection
+          v-if="tab === 'account'"
+          v-model:form="profileForm"
+          :role-label="profile.admin ? 'Administrator' : 'User'"
+          :status-label="profile.active ? 'Active' : 'Inactive'"
+          :saving="savingProfile"
+          @save="saveProfile"
+        />
+        <ProfilePasswordSection
+          v-else-if="tab === 'password'"
+          v-model:form="passwordForm"
+          :saving="savingPassword"
+          @save="changePassword"
+        />
+        <ProfileLinkedAccountsSection
+          v-else-if="tab === 'linked'"
+          :provider-ids="readyOAuthIds"
+          :linked="oauthLinked"
+          :loading="oauthLoading"
+          :busy-id="oauthBusy"
+          @unlink="unlinkOAuth"
+        />
       </div>
     </div>
   </div>
@@ -361,6 +289,14 @@ watch(() => authUser.value?.id, () => {
 
 .profile-header {
   margin-bottom: 1.25rem;
+}
+
+.page-title {
+  margin: 0;
+}
+
+.page-lead {
+  margin: 0.5rem 0 0;
 }
 
 .profile-shell {
@@ -416,19 +352,6 @@ watch(() => authUser.value?.id, () => {
 .profile-pane {
   padding: 1.25rem 1.5rem 1.5rem;
   min-width: 0;
-}
-
-.oauth-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.oauth-icon {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-  flex-shrink: 0;
 }
 
 @media (max-width: 800px) {
