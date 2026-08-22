@@ -1,5 +1,5 @@
 import { prisma } from '../../utils/prisma'
-import { mergeSettings } from '../../utils/settings'
+import { mergeSettings, oauthProviderReady, OAUTH_PROVIDER_IDS } from '../../utils/settings'
 
 /** Unauthenticated — only non-sensitive values safe for health checks / login page. */
 export default defineEventHandler(async () => {
@@ -8,7 +8,13 @@ export default defineEventHandler(async () => {
   return {
     data: {
       info_polling_interval: settings.info_polling_interval,
-      signup_enable: settings.signup_enable
+      signup_enable: settings.signup_enable,
+      oauth_providers: Object.fromEntries(
+        OAUTH_PROVIDER_IDS.map((id) => [
+          id,
+          { enabled: oauthProviderReady(settings.oauth_providers[id]) }
+        ])
+      )
     }
   }
 })

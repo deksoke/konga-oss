@@ -53,7 +53,7 @@ function legacyKeys(): Buffer[] {
   return keys
 }
 
-function decryptWithKey(blob: string, key: Buffer): KongCredentials {
+function decryptUtf8WithKey(blob: string, key: Buffer): string {
   const buf = Buffer.from(blob, 'base64')
   if (buf.length < 28) {
     throw new CredentialsDecryptError('Invalid credentials blob')
@@ -64,19 +64,46 @@ function decryptWithKey(blob: string, key: Buffer): KongCredentials {
   const decipher = createDecipheriv('aes-256-gcm', key, iv)
   decipher.setAuthTag(tag)
   const decrypted = Buffer.concat([decipher.update(data), decipher.final()])
-  return JSON.parse(decrypted.toString('utf8')) as KongCredentials
+  return decrypted.toString('utf8')
+}
+
+function decryptWithKey(blob: string, key: Buffer): KongCredentials {
+  return JSON.parse(decryptUtf8WithKey(blob, key)) as KongCredentials
+}
+
+export function encryptUtf8(plaintext: string): string {
+  if (!plaintext) return ''
+  const iv = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', primaryKey(), iv)
+  const encrypted = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return Buffer.concat([iv, tag, encrypted]).toString('base64')
+}
+
+export function decryptUtf8(blob: string): string {
+  if (!blob) return ''
+  try {
+    return decryptUtf8WithKey(blob, primaryKey())
+  } catch {
+    // fall through
+  }
+  for (const key of legacyKeys()) {
+    try {
+      return decryptUtf8WithKey(blob, key)
+    } catch {
+      // try next
+    }
+  }
+  throw new CredentialsDecryptError(
+    'Stored secret is encrypted with a different NODE_CREDENTIALS_KEY. Re-save the value, or set NODE_CREDENTIALS_KEY_LEGACY to the previous key.'
+  )
 }
 
 export function encryptCredentials(payload: KongCredentials): string {
   if (!payload || Object.keys(payload).length === 0) {
     return ''
   }
-  const iv = randomBytes(12)
-  const cipher = createCipheriv('aes-256-gcm', primaryKey(), iv)
-  const plaintext = Buffer.from(JSON.stringify(payload), 'utf8')
-  const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()])
-  const tag = cipher.getAuthTag()
-  return Buffer.concat([iv, tag, encrypted]).toString('base64')
+  return encryptUtf8(JSON.stringify(payload))
 }
 
 export type DecryptResult = {

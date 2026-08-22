@@ -25,20 +25,41 @@ enum KongAuthType {
   basic_auth
 }
 
+enum OAuthProvider {
+  google
+  facebook
+  line
+  github
+  gitlab
+}
+
 model User {
-  id           String          @id @default(cuid())
-  username     String          @unique
-  email        String          @unique
-  passwordHash String
-  firstName    String          @default("")
-  lastName     String          @default("")
-  role         Role            @default(user)
-  active       Boolean         @default(true)
-  theme        ThemePreference @default(auto)
-  activeNodeId String?
-  activeNode   KongNode?       @relation(fields: [activeNodeId], references: [id], onDelete: SetNull)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id            String             @id @default(cuid())
+  username      String             @unique
+  email         String             @unique
+  passwordHash  String
+  firstName     String             @default("")
+  lastName      String             @default("")
+  role          Role               @default(user)
+  active        Boolean            @default(true)
+  theme         ThemePreference    @default(auto)
+  activeNodeId  String?
+  activeNode    KongNode?          @relation(fields: [activeNodeId], references: [id], onDelete: SetNull)
+  oauthAccounts UserOAuthAccount[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model UserOAuthAccount {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       OAuthProvider
+  providerUserId String
+  createdAt      DateTime      @default(now())
+
+  @@unique([provider, providerUserId])
+  @@unique([userId, provider])
 }
 
 model KongNode {
