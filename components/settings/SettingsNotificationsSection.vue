@@ -259,11 +259,11 @@ async function testIntegration(item: SettingsIntegration) {
       <div class="grid-2">
         <div>
           <label class="label">Default sender name</label>
-          <input v-model="settings.email_default_sender_name" class="input" required />
+          <input v-model="settings.email_default_sender_name" class="input" required @change="save()" />
         </div>
         <div>
           <label class="label">Default sender address</label>
-          <input v-model="settings.email_default_sender" class="input" type="email" required />
+          <input v-model="settings.email_default_sender" class="input" type="email" required @change="save()" />
         </div>
       </div>
 

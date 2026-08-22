@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { Settings } from '~/types/settings'
+import type { SaveSettings, Settings } from '~/types/settings'
 
 defineProps<{
   settings: Settings
+  save: SaveSettings
 }>()
 </script>
 
@@ -12,12 +13,18 @@ defineProps<{
     <div class="grid-2">
       <div>
         <label class="label">Dashboard refresh interval</label>
-        <input v-model.number="settings.info_polling_interval" class="input" type="number" min="0" />
+        <input
+          v-model.number="settings.info_polling_interval"
+          class="input"
+          type="number"
+          min="0"
+          @change="save()"
+        />
         <p class="help">Milliseconds. Set to 0 to disable polling.</p>
       </div>
       <div>
         <label class="label">Base URL</label>
-        <input v-model="settings.baseUrl" class="input" placeholder="ex. http://my-konga.io" />
+        <input v-model="settings.baseUrl" class="input" placeholder="ex. http://my-konga.io" @change="save()" />
         <p class="help">Used for generating links. Leave blank to use the server address.</p>
       </div>
     </div>
