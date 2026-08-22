@@ -182,9 +182,9 @@ onMounted(() => {
           </div>
         </div>
         <p class="help" style="margin: 0 0 0.75rem">{{ oauthMeta[id].help }}</p>
-        <p class="help" style="margin: 0 0 0.5rem; word-break: break-all">
+        <!-- <p class="help" style="margin: 0 0 0.5rem; word-break: break-all">
           {{ oauthCallbackUrl(id) }}
-        </p>
+        </p> -->
         <div class="row" style="gap: 0.5rem; flex-wrap: wrap">
           <button class="btn" type="button" @click="copyCallback(id)">Copy callback URL</button>
         </div>
