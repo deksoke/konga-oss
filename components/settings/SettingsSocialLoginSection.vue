@@ -117,22 +117,30 @@ async function saveOAuth() {
   }
 }
 
-async function toggleOAuth(id: OAuthProviderId) {
+async function toggleOAuth(id: OAuthProviderId, event: Event) {
+  const input = event.target as HTMLInputElement
   const row = props.settings.oauth_providers[id]
-  if (!row.enabled && (!row.clientId || !row.secretConfigured)) {
+  const next = input.checked
+  if (next && (!row.clientId || !row.secretConfigured)) {
+    input.checked = false
     openOAuthConfig(id)
     useNotify().error('Configure client ID and secret before enabling')
     return
   }
-  const res = await $fetch<{ data: Settings }>('/api/settings', {
-    method: 'PUT',
-    body: {
-      oauth_providers: {
-        [id]: { enabled: !row.enabled, clientId: row.clientId }
+  try {
+    const res = await $fetch<{ data: Settings }>('/api/settings', {
+      method: 'PUT',
+      body: {
+        oauth_providers: {
+          [id]: { enabled: next, clientId: row.clientId }
+        }
       }
-    }
-  })
-  emit('updated', res.data)
+    })
+    emit('updated', res.data)
+  } catch (e: any) {
+    input.checked = row.enabled
+    useNotify().error(e?.data?.statusMessage || 'Failed to update provider')
+  }
 }
 
 onMounted(() => {
@@ -159,7 +167,19 @@ onMounted(() => {
             <img :src="oauthMeta[id].icon" :alt="oauthMeta[id].name" class="oauth-icon" width="24" height="24" />
             <strong>{{ oauthMeta[id].name }}</strong>
           </span>
-          <button class="gear-btn" type="button" title="Configure" @click="openOAuthConfig(id)">⚙</button>
+          <div class="integration-actions">
+            <label class="toggle" :title="settings.oauth_providers[id].enabled ? 'Enabled' : 'Disabled'">
+              <input
+                type="checkbox"
+                :checked="settings.oauth_providers[id].enabled"
+                @change="toggleOAuth(id, $event)"
+              />
+              <span class="toggle-track" aria-hidden="true">
+                <span class="toggle-thumb" />
+              </span>
+            </label>
+            <button class="gear-btn" type="button" title="Configure" @click="openOAuthConfig(id)">⚙</button>
+          </div>
         </div>
         <p class="help" style="margin: 0 0 0.75rem">{{ oauthMeta[id].help }}</p>
         <p class="help" style="margin: 0 0 0.5rem; word-break: break-all">
@@ -167,9 +187,6 @@ onMounted(() => {
         </p>
         <div class="row" style="gap: 0.5rem; flex-wrap: wrap">
           <button class="btn" type="button" @click="copyCallback(id)">Copy callback URL</button>
-          <button class="btn" type="button" @click="toggleOAuth(id)">
-            {{ settings.oauth_providers[id].enabled ? 'Disable' : 'Enable' }}
-          </button>
         </div>
         <p v-if="settings.oauth_providers[id].secretConfigured" class="ok-inline" style="margin: 0.5rem 0 0">
           Secret saved
@@ -234,6 +251,12 @@ onMounted(() => {
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+}
+.integration-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 .oauth-icon {
   width: 24px;
