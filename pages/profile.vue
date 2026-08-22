@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import facebookIcon from '~/assets/images/social-logins/facebook.png'
+import githubIcon from '~/assets/images/social-logins/github.png'
+import gitlabIcon from '~/assets/images/social-logins/gitlab.png'
+import googleIcon from '~/assets/images/social-logins/google.png'
+import lineIcon from '~/assets/images/social-logins/line.png'
+
 definePageMeta({ layout: 'default' })
 
 type AppUser = {
@@ -34,12 +40,12 @@ const oauthErrors: Record<string, string> = {
   login_required: 'Sign in first to link a social account.'
 }
 
-const oauthLabels = {
-  google: 'Google',
-  facebook: 'Facebook',
-  line: 'LINE',
-  github: 'GitHub',
-  gitlab: 'GitLab'
+const oauthMeta = {
+  google: { name: 'Google', icon: googleIcon },
+  facebook: { name: 'Facebook', icon: facebookIcon },
+  line: { name: 'LINE', icon: lineIcon },
+  github: { name: 'GitHub', icon: githubIcon },
+  gitlab: { name: 'GitLab', icon: gitlabIcon }
 } as const
 const oauthIds = ['google', 'facebook', 'line', 'github', 'gitlab'] as const
 
@@ -186,9 +192,9 @@ async function unlinkOAuth(id: (typeof oauthIds)[number]) {
   try {
     await $fetch(`/api/auth/oauth/${id}`, { method: 'DELETE' })
     oauthLinked[id] = false
-    useNotify().success(`${oauthLabels[id]} unlinked`)
+    useNotify().success(`${oauthMeta[id].name} unlinked`)
   } catch (e: any) {
-    useNotify().error(e?.data?.statusMessage || `Failed to unlink ${oauthLabels[id]}`)
+    useNotify().error(e?.data?.statusMessage || `Failed to unlink ${oauthMeta[id].name}`)
   } finally {
     oauthBusy.value = null
   }
@@ -320,9 +326,12 @@ watch(() => authUser.value?.id, () => {
               class="row"
               style="justify-content: space-between; align-items: center; gap: 0.75rem"
             >
-              <span>{{ oauthLabels[id] }} — {{ oauthLinked[id] ? 'Linked' : 'Not linked' }}</span>
+              <span class="oauth-name">
+                <img :src="oauthMeta[id].icon" :alt="oauthMeta[id].name" class="oauth-icon" width="24" height="24" />
+                {{ oauthMeta[id].name }} — {{ oauthLinked[id] ? 'Linked' : 'Not linked' }}
+              </span>
               <a v-if="!oauthLinked[id]" class="btn" :href="`/api/auth/oauth/${id}/start?intent=link`">
-                Link {{ oauthLabels[id] }}
+                Link {{ oauthMeta[id].name }}
               </a>
               <button
                 v-else
@@ -404,6 +413,19 @@ watch(() => authUser.value?.id, () => {
 .profile-pane {
   padding: 1.25rem 1.5rem 1.5rem;
   min-width: 0;
+}
+
+.oauth-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.oauth-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 @media (max-width: 800px) {
