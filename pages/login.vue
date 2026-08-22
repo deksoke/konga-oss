@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import facebookIcon from '~/assets/images/social-logins/facebook.png'
+import githubIcon from '~/assets/images/social-logins/github.png'
+import gitlabIcon from '~/assets/images/social-logins/gitlab.png'
+import googleIcon from '~/assets/images/social-logins/google.png'
+import lineIcon from '~/assets/images/social-logins/line.png'
+
 definePageMeta({ layout: 'auth' })
 
 const { login } = useAuth()
@@ -7,13 +13,22 @@ const username = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
-const oauthProviders = ref({
+const oauthProviders = reactive({
   google: false,
   facebook: false,
   line: false,
   github: false,
   gitlab: false
 })
+
+const oauthMeta = {
+  google: { name: 'Google', icon: googleIcon },
+  facebook: { name: 'Facebook', icon: facebookIcon },
+  line: { name: 'LINE', icon: lineIcon },
+  github: { name: 'GitHub', icon: githubIcon },
+  gitlab: { name: 'GitLab', icon: gitlabIcon }
+} as const
+const oauthIds = ['google', 'facebook', 'line', 'github', 'gitlab'] as const
 
 const oauthErrors: Record<string, string> = {
   not_configured: 'Social login is not configured.',
@@ -41,32 +56,25 @@ async function loadOAuth() {
       data: { oauth_providers?: Record<string, { enabled?: boolean }> }
     }>('/api/settings/public')
     const providers = res.data.oauth_providers || {}
-    oauthProviders.value = {
+    Object.assign(oauthProviders, {
       google: Boolean(providers.google?.enabled),
       facebook: Boolean(providers.facebook?.enabled),
       line: Boolean(providers.line?.enabled),
       github: Boolean(providers.github?.enabled),
       gitlab: Boolean(providers.gitlab?.enabled)
-    }
+    })
   } catch {
-    oauthProviders.value = {
+    Object.assign(oauthProviders, {
       google: false,
       facebook: false,
       line: false,
       github: false,
       gitlab: false
-    }
+    })
   }
 }
 
-const showOAuth = computed(
-  () =>
-    oauthProviders.value.google ||
-    oauthProviders.value.facebook ||
-    oauthProviders.value.line ||
-    oauthProviders.value.github ||
-    oauthProviders.value.gitlab
-)
+const readyOAuthIds = computed(() => oauthIds.filter((id) => oauthProviders[id]))
 
 async function onSubmit() {
   error.value = ''
@@ -74,7 +82,7 @@ async function onSubmit() {
   try {
     await login(username.value.trim(), password.value)
     const target = redirectTarget()
-    if (import.meta.client) {
+    if (typeof window !== 'undefined') {
       window.location.assign(target)
       return
     }
@@ -89,7 +97,7 @@ async function onSubmit() {
 onMounted(loadOAuth)
 watch(
   () => route.query.oauth_error,
-  (code) => {
+  (code: unknown) => {
     if (typeof code === 'string' && oauthErrors[code]) error.value = oauthErrors[code]
   },
   { immediate: true }
@@ -133,15 +141,35 @@ watch(
         {{ loading ? 'Signing in…' : 'Sign in' }}
       </button>
     </form>
-    <template v-if="showOAuth">
+    <template v-if="readyOAuthIds.length">
       <p class="muted" style="text-align: center; margin: 0">or</p>
       <div class="stack">
-        <a v-if="oauthProviders.google" class="btn" href="/api/auth/oauth/google/start">Continue with Google</a>
-        <a v-if="oauthProviders.facebook" class="btn" href="/api/auth/oauth/facebook/start">Continue with Facebook</a>
-        <a v-if="oauthProviders.line" class="btn" href="/api/auth/oauth/line/start">Continue with LINE</a>
-        <a v-if="oauthProviders.github" class="btn" href="/api/auth/oauth/github/start">Continue with GitHub</a>
-        <a v-if="oauthProviders.gitlab" class="btn" href="/api/auth/oauth/gitlab/start">Continue with GitLab</a>
+        <a
+          v-for="id in readyOAuthIds"
+          :key="id"
+          class="btn oauth-btn"
+          :href="`/api/auth/oauth/${id}/start`"
+        >
+          <img :src="oauthMeta[id].icon" :alt="oauthMeta[id].name" class="oauth-icon" width="20" height="20" />
+          Continue with {{ oauthMeta[id].name }}
+        </a>
       </div>
     </template>
   </div>
 </template>
+
+<style scoped>
+.oauth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.oauth-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+</style>

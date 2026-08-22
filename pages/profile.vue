@@ -344,7 +344,10 @@ watch(() => authUser.value?.id, () => {
               </button>
             </div>
           </template>
-          <p v-else class="muted" style="margin: 0">No social login providers are enabled.</p>
+          <p v-else class="muted" style="margin: 0">
+            No social login providers are ready to use. Enable a provider in Settings and save its client ID and
+            secret.
+          </p>
         </div>
       </div>
     </div>
