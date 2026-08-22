@@ -1,7 +1,8 @@
 import { ZodError, z } from 'zod'
 import { prisma } from '../../utils/prisma'
 import { requireAdmin } from '../../utils/session'
-import { mergeSettings } from '../../utils/settings'
+import { applyOAuthProvidersUpdate, mergeSettings, sanitizeSettings } from '../../utils/settings'
+import { encryptUtf8 } from '../../utils/crypto'
 
 const permSchema = z.object({
   create: z.boolean(),
@@ -51,7 +52,18 @@ const bodySchema = z
     email_transports: z.array(transportSchema).max(10).optional(),
     notify_when: z.record(z.any()).optional(),
     integrations: z.array(z.record(z.any())).max(20).optional(),
-    user_permissions: z.record(permSchema).optional()
+    user_permissions: z.record(permSchema).optional(),
+    oauth_providers: z
+      .record(
+        z.object({
+          enabled: z.boolean().optional(),
+          clientId: z.string().max(512).optional(),
+          clientSecret: z.string().max(1024).optional(),
+          secretConfigured: z.boolean().optional(),
+          issuerBaseUrl: z.string().max(512).optional()
+        })
+      )
+      .optional()
   })
   .strict()
 
@@ -72,7 +84,17 @@ export default defineEventHandler(async (event) => {
   }
 
   const current = await prisma.appSettings.findUnique({ where: { id: 'default' } })
-  const merged = mergeSettings({ ...(current?.data as object), ...body })
+  const { oauth_providers: oauthBody, ...rest } = body
+  const merged = mergeSettings({ ...(current?.data as object), ...rest })
+
+  if (oauthBody) {
+    const currentSettings = mergeSettings(current?.data)
+    merged.oauth_providers = applyOAuthProvidersUpdate(
+      currentSettings.oauth_providers,
+      oauthBody,
+      encryptUtf8
+    )
+  }
 
   if ('default_transport' in body || 'email_transports' in body) {
     merged.email_notifications = Boolean(merged.default_transport)
@@ -83,5 +105,5 @@ export default defineEventHandler(async (event) => {
     create: { id: 'default', data: merged },
     update: { data: merged }
   })
-  return { data: mergeSettings(row.data) }
+  return { data: sanitizeSettings(mergeSettings(row.data)) }
 })
