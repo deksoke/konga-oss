@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
       where: { provider_providerUserId: { provider, providerUserId } }
     })
     if (existing && existing.userId !== stored.userId) {
-      return sendRedirect(event, oauthErrorRedirect('/profile', 'already_linked'), 302)
+      return sendRedirect(event, oauthErrorRedirect('/profile?tab=linked', 'already_linked'), 302)
     }
     if (!existing) {
       try {
@@ -77,10 +77,10 @@ export default defineEventHandler(async (event) => {
           data: { userId: stored.userId, provider, providerUserId }
         })
       } catch {
-        return sendRedirect(event, oauthErrorRedirect('/profile', 'already_linked'), 302)
+        return sendRedirect(event, oauthErrorRedirect('/profile?tab=linked', 'already_linked'), 302)
       }
     }
-    return sendRedirect(event, '/profile?oauth=linked', 302)
+    return sendRedirect(event, '/profile?tab=linked&oauth=linked', 302)
   }
 
   const account = await prisma.userOAuthAccount.findUnique({

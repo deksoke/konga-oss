@@ -3,9 +3,25 @@ import type { Settings } from '~/types/settings'
 
 definePageMeta({ layout: 'default' })
 
+const TABS = [
+  { id: 'general', label: 'General settings' },
+  { id: 'signup', label: 'Sign up restrictions' },
+  { id: 'social', label: 'Social logins' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'permissions', label: 'User permissions' }
+] as const
+
+type SettingsTab = (typeof TABS)[number]['id']
+
+const route = useRoute()
 const settings = ref<Settings | null>(null)
 const error = ref('')
 const saving = ref(false)
+
+const tab = computed<SettingsTab>(() => {
+  const q = String(route.query.tab || 'general')
+  return TABS.some((item) => item.id === q) ? (q as SettingsTab) : 'general'
+})
 
 async function load() {
   error.value = ''
@@ -44,24 +60,133 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="stack" style="max-width: 56rem">
-    <div>
+  <div class="settings-page">
+    <div class="settings-header">
       <h1 style="margin: 0">Settings</h1>
       <p class="muted" style="margin: 0.5rem 0 0">Application-wide Konga configuration.</p>
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>
 
-    <form v-if="settings" class="stack" @submit.prevent="save()">
-      <SettingsGeneralSection :settings="settings" />
-      <SettingsSignupSection :settings="settings" :save="save" />
-      <SettingsSocialLoginSection :settings="settings" @updated="settings = $event" />
-      <SettingsNotificationsSection :settings="settings" :save="save" :saving="saving" />
-      <SettingsPermissionsSection :settings="settings" :save="save" />
+    <div v-if="settings" class="settings-shell">
+      <nav class="settings-nav" aria-label="Settings sections">
+        <NuxtLink
+          v-for="item in TABS"
+          :key="item.id"
+          class="settings-nav-link"
+          :class="{ active: tab === item.id }"
+          :to="{ path: '/settings', query: { tab: item.id } }"
+        >
+          {{ item.label }}
+        </NuxtLink>
+      </nav>
 
-      <button class="btn btn-primary" type="submit" :disabled="saving" style="width: 100%">
-        {{ saving ? 'Saving...' : 'Save settings' }}
-      </button>
-    </form>
+      <div class="settings-pane stack">
+        <SettingsGeneralSection v-if="tab === 'general'" :settings="settings" :save="save" />
+        <SettingsSignupSection v-else-if="tab === 'signup'" :settings="settings" :save="save" />
+        <SettingsSocialLoginSection
+          v-else-if="tab === 'social'"
+          :settings="settings"
+          @updated="settings = $event"
+        />
+        <SettingsNotificationsSection
+          v-else-if="tab === 'notifications'"
+          :settings="settings"
+          :save="save"
+          :saving="saving"
+        />
+        <SettingsPermissionsSection v-else-if="tab === 'permissions'" :settings="settings" :save="save" />
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.settings-page {
+  min-width: 0;
+}
+
+.settings-header {
+  margin-bottom: 1.25rem;
+}
+
+.settings-shell {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0;
+  border-right: 1px solid var(--border);
+  background: var(--panel-nav-bg);
+  min-height: 24rem;
+}
+
+.settings-nav-link {
+  position: relative;
+  display: block;
+  padding: 0.55rem 1rem 0.55rem 1.15rem;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+
+.settings-nav-link:hover {
+  background: var(--hover-tint);
+}
+
+.settings-nav-link.active {
+  font-weight: 650;
+  background: var(--hover-tint);
+}
+
+.settings-nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+
+.settings-pane {
+  padding: 1.25rem 1.5rem 1.5rem;
+  min-width: 0;
+}
+
+@media (max-width: 800px) {
+  .settings-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-height: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem;
+    gap: 0.25rem;
+  }
+
+  .settings-nav-link {
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+  }
+
+  .settings-nav-link.active::before {
+    display: none;
+  }
+}
+</style>

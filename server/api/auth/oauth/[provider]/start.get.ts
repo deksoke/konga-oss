@@ -29,8 +29,9 @@ export default defineEventHandler(async (event) => {
 
   const config = await loadOAuthProvider(provider)
   if (!config) {
-    const fallback = intent === 'link' ? '/profile' : '/login'
-    return sendRedirect(event, `${fallback}?oauth_error=not_configured`, 302)
+    const fallback = intent === 'link' ? '/profile?tab=linked' : '/login'
+    const sep = fallback.includes('?') ? '&' : '?'
+    return sendRedirect(event, `${fallback}${sep}oauth_error=not_configured`, 302)
   }
 
   const { verifier, challenge } = createPkce()
