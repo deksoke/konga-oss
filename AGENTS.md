@@ -1,21 +1,29 @@
-# ชุดติดตั้งทีม Agent
+# AGENTS.md
 
-ต้นฉบับบทบาทกลาง กฎคุมลูป และเทมเพลตกติกาโปรเจ็กต์ สำหรับ Cursor IDE บน Windows
+## ระบบนี้ทำอะไร
+- ชื่อระบบ: KONGA-OSS
+- หน้าที่สั้นๆ: KONG Admin UI Management สำหรับตั้งค่าคอนฟิค Kong API Gateway
+
+## Stack
+- TypeScript / Nuxt 3 / PostgreSQL:
+
+## โครงสร้างหลัก
+- `/` —
+- `tests/` —
 
 ## คำสั่ง
+- เทส: npm run test
+- lint:
+- dev server: npm run dev
 
-- เทสสัญญาชุดติดตั้ง: `npm test`
+## Git
+- default branch: main
+- รูปแบบ branch: `feat/<short-name>`, `fix/<short-name>`
+- ห้าม push `main` / `master`
+- ห้าม commit หรือเปิด MR ถ้าผู้ใช้ไม่ได้สั่ง
 
-## Agent skills
+## สิ่งที่ห้ามทำใน repo นี้
+-
 
-### Issue tracker
-
-Issues live in GitLab at agentic-ai1830536/agentic-ai-dev-team. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default role names: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: root CONTEXT.md and docs/adr/. See `docs/agents/domain.md`.
+## โดเมนเฉพาะงาน
+-
