@@ -1,8 +1,9 @@
 import type { ThemePreference, ResolvedTheme } from './useAuth'
+import { themeFromLocalTime } from '~/utils/themeFromLocalHour'
 
 function systemTheme(): ResolvedTheme {
-  if (import.meta.client && window.matchMedia('(prefers-color-scheme: light)').matches) {
-    return 'day'
+  if (import.meta.client) {
+    return themeFromLocalTime(new Date())
   }
   return 'night'
 }

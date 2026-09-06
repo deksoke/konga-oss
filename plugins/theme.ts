@@ -1,4 +1,6 @@
-export default defineNuxtPlugin(() => {
+import { msUntilNextThemeBoundary } from '~/utils/themeFromLocalHour'
+
+export default defineNuxtPlugin((nuxtApp) => {
   const { user } = useAuth()
   const { preference, resolved, apply, syncFromUser } = useTheme()
 
@@ -18,10 +20,28 @@ export default defineNuxtPlugin(() => {
   )
 
   if (import.meta.client) {
-    const mq = window.matchMedia('(prefers-color-scheme: light)')
-    const onChange = () => {
-      if (preference.value === 'auto') apply('auto')
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    function scheduleNext() {
+      if (timer !== undefined) clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (preference.value === 'auto') apply('auto')
+        scheduleNext()
+      }, msUntilNextThemeBoundary(new Date()))
     }
-    mq.addEventListener('change', onChange)
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible' && preference.value === 'auto') {
+        apply('auto')
+      }
+    }
+
+    scheduleNext()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    nuxtApp.hook('app:beforeUnmount', () => {
+      if (timer !== undefined) clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    })
   }
 })

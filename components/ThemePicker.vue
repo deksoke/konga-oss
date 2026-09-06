@@ -18,7 +18,7 @@ const options: Array<{ value: ThemePreference; label: string }> = [
       type="button"
       class="theme-btn"
       :class="{ active: preference === opt.value }"
-      :title="opt.label"
+      :title="opt.value === 'auto' ? 'Auto (local time 06:00–18:00)' : opt.label"
       @click="setPreference(opt.value)"
     >
       <span v-if="opt.value === 'day'" aria-hidden="true">☀</span>
