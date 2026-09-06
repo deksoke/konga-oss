@@ -7,7 +7,8 @@ export default defineNuxtConfig({
     sessionPassword: process.env.NUXT_SESSION_PASSWORD || '',
     credentialsKey: process.env.NODE_CREDENTIALS_KEY || '',
     public: {
-      appName: 'Konga'
+      appName: 'Konga',
+      buildDate: process.env.NUXT_PUBLIC_BUILD_DATE || ''
     }
   },
   nitro: {
