@@ -16,6 +16,7 @@ import {
   buildMulticastBody,
   buildPushBody,
   chunkIds,
+  formatLineApiError,
   isValidLineChannelAccessToken,
   lineFieldValue,
   parseLineSendMode,
@@ -128,6 +129,7 @@ export type LineNotifyResult =
         | 'invalid_mode'
         | 'http_error'
       status?: number
+      detail?: string
     }
 
 function lineIntegrationConfig(settings: AppSettingsData) {
@@ -167,17 +169,25 @@ export async function sendLineNotification(settings: AppSettingsData, message: s
   const headers = { 'Content-Type': 'application/json' }
 
   async function post(url: string, body: unknown): Promise<LineNotifyResult> {
-    const res = await lineApiFetch(url, token, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    })
-    if (!res.ok) {
-      await res.text().catch(() => '')
-      console.error('[notify/line]', res.status)
-      return { ok: false, reason: 'http_error', status: res.status }
+    try {
+      const res = await lineApiFetch(url, token, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      })
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => '')
+        const detail = formatLineApiError(res.status, bodyText)
+        console.error('[notify/line]', detail)
+        return { ok: false, reason: 'http_error', status: res.status, detail }
+      }
+      return { ok: true }
+    } catch (err: unknown) {
+      const bodyText = err instanceof Error ? err.message : 'Network error'
+      const detail = formatLineApiError(0, bodyText)
+      console.error('[notify/line]', detail)
+      return { ok: false, reason: 'http_error', detail }
     }
-    return { ok: true }
   }
 
   if (plan.kind === 'broadcast') {
