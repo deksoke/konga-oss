@@ -4,6 +4,7 @@ export const LINE_MULTICAST_URL = 'https://api.line.me/v2/bot/message/multicast'
 export const LINE_FOLLOWERS_IDS_URL = 'https://api.line.me/v2/bot/followers/ids'
 
 export const LINE_TEXT_MAX = 5000
+export const LINE_API_ERROR_MAX = 500
 export const LINE_MULTICAST_CHUNK = 500
 export const LINE_ROOMS_CAP = 20
 export const LINE_FOLLOWERS_CAP = 200
@@ -54,6 +55,53 @@ export function uniqueValidLineIds(ids: string[], cap?: number) {
 export function truncateLineText(text: string) {
   if (text.length <= LINE_TEXT_MAX) return text
   return text.slice(0, LINE_TEXT_MAX)
+}
+
+function lineErrorSnippet(text: string) {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
+/** HTTP status + LINE `message` for operators. Never include tokens. */
+export function formatLineApiError(status: number, bodyText: string) {
+  const raw = lineErrorSnippet(String(bodyText ?? ''))
+  let lineMessage = ''
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as { message?: unknown }
+      if (typeof parsed?.message === 'string' && parsed.message.trim()) {
+        lineMessage = lineErrorSnippet(parsed.message)
+      }
+    } catch {
+      lineMessage = ''
+    }
+    if (!lineMessage) lineMessage = raw
+  }
+
+  const base = `LINE Messaging API failed (HTTP ${status})`
+  const combined = lineMessage ? `${base}: ${lineMessage}` : base
+  return combined.length <= LINE_API_ERROR_MAX ? combined : combined.slice(0, LINE_API_ERROR_MAX)
+}
+
+export function lineTestErrorMessage(result: {
+  reason: string
+  status?: number
+  detail?: string
+}) {
+  if (result.reason === 'disabled') return 'Enable LINE Official first'
+  if (result.reason === 'missing_token') return 'Save a Channel Access Token first'
+  if (result.reason === 'invalid_token') return 'Channel Access Token is invalid'
+  if (result.reason === 'empty_rooms') return 'Select at least one group or room, or add a Group/Room ID'
+  if (result.reason === 'empty_users') return 'Select at least one follower'
+  if (result.reason === 'invalid_mode') return 'Choose a LINE send mode (all followers, rooms, or users)'
+  if (result.reason === 'http_error' && result.detail) return result.detail
+  return `LINE Messaging API failed${result.status ? ` (HTTP ${result.status})` : ''}`
+}
+
+export function integrationTestErrorMessage(
+  error: { data?: { statusMessage?: string; message?: string } } | null | undefined,
+  fallback: string
+) {
+  return error?.data?.statusMessage || error?.data?.message || fallback
 }
 
 function textMessage(text: string): LineTextMessage {

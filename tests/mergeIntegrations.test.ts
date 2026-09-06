@@ -84,4 +84,23 @@ describe('mergeSettings integrations', () => {
     expect(line?.config.line_known_rooms).toEqual([{ id: 'Croom1', name: 'Ops', kind: 'group' }])
     expect(line?.config.line_known_users).toEqual([{ id: 'Uaaa', name: 'Ada' }])
   })
+
+  it('round-trips line_send_mode followers', () => {
+    const merged = mergeSettings({
+      integrations: [
+        {
+          id: 'line',
+          name: 'LINE Official',
+          config: {
+            enabled: true,
+            fields: [],
+            line_send_mode: 'followers'
+          }
+        }
+      ]
+    })
+
+    const line = merged.integrations.find((i) => i.id === 'line')
+    expect(line?.config.line_send_mode).toBe('followers')
+  })
 })

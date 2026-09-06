@@ -4,7 +4,7 @@ import IntegrationConfigModal from '~/components/settings/IntegrationConfigModal
 import LineConfigModal from '~/components/settings/LineConfigModal.vue'
 import TransportConfigModal from '~/components/settings/TransportConfigModal.vue'
 import type { MailgunSettings, SaveSettings, Settings, SettingsIntegration, SmtpSettings, Transport } from '~/types/settings'
-import { lineFieldValue, parseLineSendMode } from '~/utils/lineMessaging'
+import { integrationTestErrorMessage, lineFieldValue, parseLineSendMode } from '~/utils/lineMessaging'
 
 const props = defineProps<{
   settings: Settings
@@ -270,7 +270,7 @@ async function testIntegration(item: SettingsIntegration) {
     await $fetch(`/api/settings/integrations/${item.id}/test`, { method: 'POST' })
     useNotify().success(`Test message sent to ${item.name}`)
   } catch (e: any) {
-    useNotify().error(e?.data?.statusMessage || `${item.name} test failed`)
+    useNotify().error(integrationTestErrorMessage(e, `${item.name} test failed`))
   } finally {
     testingIntegration.value = null
   }
