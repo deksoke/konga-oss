@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { prisma } from './prisma'
+import { lineApiFetch } from './lineApi'
 import {
   mergeSettings,
   type AppSettingsData,
@@ -7,10 +8,46 @@ import {
   type SmtpTransportSettings
 } from './settings'
 import { isSafeExternalWebhookUrl, isSafeHostname } from './urlSafety'
+import {
+  LINE_BROADCAST_URL,
+  LINE_MULTICAST_URL,
+  LINE_PUSH_URL,
+  buildBroadcastBody,
+  buildMulticastBody,
+  buildPushBody,
+  chunkIds,
+  isValidLineChannelAccessToken,
+  lineFieldValue,
+  parseLineSendMode,
+  resolveLineSendPlan
+} from '../../utils/lineMessaging'
 
 export async function loadAppSettings(): Promise<AppSettingsData> {
   const row = await prisma.appSettings.findUnique({ where: { id: 'default' } })
   return mergeSettings(row?.data)
+}
+
+export async function saveAppSettings(data: AppSettingsData): Promise<AppSettingsData> {
+  const merged = mergeSettings(data)
+  await prisma.appSettings.upsert({
+    where: { id: 'default' },
+    create: { id: 'default', data: merged },
+    update: { data: merged }
+  })
+  return merged
+}
+
+export async function patchLineIntegrationConfig(
+  patch: (
+    config: AppSettingsData['integrations'][number]['config']
+  ) => AppSettingsData['integrations'][number]['config']
+) {
+  const settings = await loadAppSettings()
+  const integrations = settings.integrations.map((item) => {
+    if (item.id !== 'line') return item
+    return { ...item, config: patch(item.config) }
+  })
+  return saveAppSettings({ ...settings, integrations })
 }
 
 function integrationWebhookUrl(settings: AppSettingsData, integrationId: string, fieldId: string) {
@@ -76,6 +113,90 @@ export async function sendDiscordNotification(settings: AppSettingsData, message
     return { ok: false as const, reason: 'http_error', status: res.status }
   }
   return { ok: true as const }
+}
+
+export type LineNotifyResult =
+  | { ok: true }
+  | {
+      ok: false
+      reason:
+        | 'disabled'
+        | 'missing_token'
+        | 'invalid_token'
+        | 'empty_rooms'
+        | 'empty_users'
+        | 'invalid_mode'
+        | 'http_error'
+      status?: number
+    }
+
+function lineIntegrationConfig(settings: AppSettingsData) {
+  const item = settings.integrations?.find((i) => i.id === 'line')
+  return item?.config
+}
+
+/** Posts text via LINE Messaging API using the saved Settings integration. Secret is not required to send. */
+export async function sendLineNotification(settings: AppSettingsData, message: string): Promise<LineNotifyResult> {
+  const config = lineIntegrationConfig(settings)
+  if (!config?.enabled) {
+    console.info('[notify/line] skipped (disabled)')
+    return { ok: false, reason: 'disabled' }
+  }
+
+  const token = lineFieldValue(config, 'line_channel_access_token')
+  if (!token) {
+    console.info('[notify/line] skipped (missing token)')
+    return { ok: false, reason: 'missing_token' }
+  }
+  if (!isValidLineChannelAccessToken(token)) {
+    console.warn('[notify/line] token rejected')
+    return { ok: false, reason: 'invalid_token' }
+  }
+
+  const plan = resolveLineSendPlan(
+    parseLineSendMode(config.line_send_mode),
+    Array.isArray(config.line_selected_room_ids) ? config.line_selected_room_ids.map(String) : [],
+    Array.isArray(config.line_selected_user_ids) ? config.line_selected_user_ids.map(String) : []
+  )
+
+  if (plan.kind === 'skip') {
+    console.info('[notify/line] skipped', plan.reason)
+    return { ok: false, reason: plan.reason }
+  }
+
+  const headers = { 'Content-Type': 'application/json' }
+
+  async function post(url: string, body: unknown): Promise<LineNotifyResult> {
+    const res = await lineApiFetch(url, token, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    })
+    if (!res.ok) {
+      await res.text().catch(() => '')
+      console.error('[notify/line]', res.status)
+      return { ok: false, reason: 'http_error', status: res.status }
+    }
+    return { ok: true }
+  }
+
+  if (plan.kind === 'broadcast') {
+    return post(LINE_BROADCAST_URL, buildBroadcastBody(message))
+  }
+
+  if (plan.kind === 'push') {
+    for (const id of plan.ids) {
+      const result = await post(LINE_PUSH_URL, buildPushBody(id, message))
+      if (!result.ok) return result
+    }
+    return { ok: true }
+  }
+
+  for (const ids of chunkIds(plan.ids)) {
+    const result = await post(LINE_MULTICAST_URL, buildMulticastBody(ids, message))
+    if (!result.ok) return result
+  }
+  return { ok: true }
 }
 
 async function adminEmails() {
@@ -242,10 +363,12 @@ export async function notifyAdmins(eventKey: string, message: string) {
   const stamped = `[ ${formatStamp()} ] ${message}`
   const slackText = `*[Konga]* ${event.title}\n${stamped}`
   const discordText = `**[Konga]** ${event.title}\n${stamped}`
+  const lineText = `[Konga] ${event.title}\n${stamped}`
 
   await Promise.all([
     sendSlackNotification(settings, slackText).catch((err) => console.error('[notify/slack]', err)),
     sendDiscordNotification(settings, discordText).catch((err) => console.error('[notify/discord]', err)),
+    sendLineNotification(settings, lineText).catch((err) => console.error('[notify/line]', err)),
     sendEmailNotification(settings, event.title, stamped).catch((err) => console.error('[notify/email]', err))
   ])
 }
@@ -258,11 +381,12 @@ export async function notifyUpstreamHealth(opts: {
   slack: boolean
   discord: boolean
   email: boolean
+  line: boolean
   connectionName: string
   upstreamId: string
   unhealthyTargets: Array<{ target?: string; health?: string }>
 }) {
-  if (!opts.slack && !opts.discord && !opts.email) return
+  if (!opts.slack && !opts.discord && !opts.email && !opts.line) return
 
   const settings = await loadAppSettings()
   const stamped = formatStamp()
@@ -286,6 +410,9 @@ export async function notifyUpstreamHealth(opts: {
   }
   if (opts.discord) {
     tasks.push(sendDiscordNotification(settings, text).catch((err) => console.error('[notify/discord]', err)))
+  }
+  if (opts.line) {
+    tasks.push(sendLineNotification(settings, text).catch((err) => console.error('[notify/line]', err)))
   }
   if (opts.email) {
     tasks.push(

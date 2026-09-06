@@ -17,6 +17,11 @@ export type Transport = {
 
 export type OAuthProviderId = 'google' | 'facebook' | 'line' | 'github' | 'gitlab'
 
+export type LineSendMode = 'followers' | 'rooms' | 'users'
+
+export type LineKnownRoom = { id: string; name: string; kind: 'group' | 'room' }
+export type LineKnownUser = { id: string; name: string }
+
 export type SettingsIntegration = {
   id: string
   name: string
@@ -26,6 +31,13 @@ export type SettingsIntegration = {
     fields: Array<{ id: string; name: string; type: string; required?: boolean; value: string }>
     slack_webhook_url?: string
     discord_webhook_url?: string
+    line_channel_access_token?: string
+    line_channel_secret?: string
+    line_send_mode?: LineSendMode
+    line_selected_room_ids?: string[]
+    line_selected_user_ids?: string[]
+    line_known_rooms?: LineKnownRoom[]
+    line_known_users?: LineKnownUser[]
   }
 }
 
