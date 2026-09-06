@@ -144,6 +144,7 @@ async function runUpstreamAlerts() {
         await notifyUpstreamHealth({
           slack: alert.slack !== false,
           discord: alert.discord !== false,
+          line: alert.line !== false,
           email: Boolean(alert.email),
           connectionName: alert.connection.name,
           upstreamId: alert.upstreamId,

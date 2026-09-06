@@ -26,7 +26,8 @@ export default defineEventHandler(async (event) => {
       active: false,
       email: false,
       slack: true,
-      discord: true
+      discord: true,
+      line: true
     }
   }
 })

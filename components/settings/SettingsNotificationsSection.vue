@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import slackLogo from '~/assets/images/integrations/slack-logo.svg'
 import IntegrationConfigModal from '~/components/settings/IntegrationConfigModal.vue'
+import LineConfigModal from '~/components/settings/LineConfigModal.vue'
 import TransportConfigModal from '~/components/settings/TransportConfigModal.vue'
 import type { MailgunSettings, SaveSettings, Settings, SettingsIntegration, SmtpSettings, Transport } from '~/types/settings'
+import { lineFieldValue, parseLineSendMode } from '~/utils/lineMessaging'
 
 const props = defineProps<{
   settings: Settings
@@ -12,6 +14,7 @@ const props = defineProps<{
 
 const notifyTab = ref<'email' | 'integrations'>('email')
 const configuring = ref<SettingsIntegration | null>(null)
+const configuringLine = ref(false)
 const webhookDraft = ref('')
 const integrationError = ref('')
 const testingIntegration = ref<string | null>(null)
@@ -20,23 +23,56 @@ const smtpDraft = ref<SmtpSettings | null>(null)
 const mailgunDraft = ref<MailgunSettings | null>(null)
 const transportError = ref('')
 const testingSmtp = ref(false)
+const lineItem = computed(() => props.settings.integrations.find((row) => row.id === 'line') || null)
 
 function webhookFieldId(item: SettingsIntegration) {
+  if (item.id === 'line') return null
   if (item.id === 'discord') return 'discord_webhook_url'
   return 'slack_webhook_url'
 }
 
 function webhookValue(item: SettingsIntegration) {
   const fieldId = webhookFieldId(item)
+  if (!fieldId) return ''
   const fromField = item.config.fields?.find((f) => f.id === fieldId)?.value
   return String((item.config as Record<string, unknown>)[fieldId] || fromField || '')
 }
 
+function lineModeReady(item: SettingsIntegration) {
+  const mode = parseLineSendMode(item.config.line_send_mode)
+  if (mode === 'followers') return true
+  if (mode === 'users') return (item.config.line_selected_user_ids || []).length > 0
+  return (item.config.line_selected_room_ids || []).length > 0
+}
+
+function lineTestReady(item: SettingsIntegration) {
+  return Boolean(lineFieldValue(item.config, 'line_channel_access_token') && lineModeReady(item))
+}
+
 function integrationConfigured(item: SettingsIntegration) {
+  if (item.id === 'line') {
+    return Boolean(
+      lineFieldValue(item.config, 'line_channel_access_token') &&
+        lineFieldValue(item.config, 'line_channel_secret') &&
+        lineModeReady(item)
+    )
+  }
   return Boolean(webhookValue(item).trim())
 }
 
+function integrationTestReady(item: SettingsIntegration) {
+  if (item.id === 'line') return lineTestReady(item)
+  return integrationConfigured(item)
+}
+
+function configuredLabel(item: SettingsIntegration) {
+  return item.id === 'line' ? 'Configured' : 'Webhook saved'
+}
+
 function integrationHelp(item: SettingsIntegration) {
+  if (item.id === 'line') {
+    return 'Send notifications through the LINE Messaging API (Official Account). This is not LINE Login.'
+  }
   if (item.id === 'discord') {
     return 'Send notifications to Discord using Incoming Webhooks.'
   }
@@ -169,9 +205,17 @@ async function testSmtp() {
 }
 
 function openIntegrationConfig(item: SettingsIntegration) {
+  if (item.id === 'line') {
+    configuringLine.value = true
+    return
+  }
   configuring.value = item
   integrationError.value = ''
   webhookDraft.value = webhookValue(item)
+}
+
+function closeLineConfig() {
+  configuringLine.value = false
 }
 
 function closeIntegrationConfig() {
@@ -184,6 +228,7 @@ async function saveIntegration() {
   if (!configuring.value) return
   const item = configuring.value
   const fieldId = webhookFieldId(item)
+  if (!fieldId || item.id === 'line') return
   const url = webhookDraft.value.trim()
   if (!url) {
     integrationError.value = `${item.name} Webhook URL is required`
@@ -331,13 +376,20 @@ async function testIntegration(item: SettingsIntegration) {
                 d="M85.5 36.2a62 62 0 0 0-15.3-4.7c-.7 1.2-1.4 2.8-1.9 4.1a57 57 0 0 0-16.6 0c-.5-1.3-1.2-2.9-1.9-4.1a62 62 0 0 0-15.3 4.7C22.6 51.1 19.7 65.6 21.2 79.9c6.6 4.9 13 7.9 19.2 9.8 1.5-2.1 2.9-4.3 4.1-6.6-2.2-0.8-4.4-1.9-6.4-3.1.5-.4 1.1-.8 1.6-1.2 12.7 5.9 26.4 5.9 38.9 0 .5.4 1.1.8 1.6 1.2-2 1.2-4.2 2.3-6.4 3.1 1.2 2.3 2.5 4.5 4.1 6.6 6.2-1.9 12.6-4.9 19.2-9.8 1.8-16.6-3.1-30.9-12.6-43.7zM49.5 68.6c-3.5 0-6.4-3.2-6.4-7.1s2.8-7.1 6.4-7.1 6.5 3.2 6.4 7.1c0 3.9-2.9 7.1-6.4 7.1zm21 0c-3.5 0-6.4-3.2-6.4-7.1s2.8-7.1 6.4-7.1 6.5 3.2 6.4 7.1c0 3.9-2.9 7.1-6.4 7.1z"
               />
             </svg>
+            <svg v-else-if="item.id === 'line'" viewBox="0 0 120 120" width="72" height="72">
+              <rect width="120" height="120" rx="24" fill="#06C755" />
+              <path
+                fill="#fff"
+                d="M60 32c-18.2 0-33 12.3-33 27.4 0 13.6 12.1 25 28.5 27.1.9.2 2.1.6 2.4 1.4.3.7.2 1.8 0 2.6l-.8 4.8c-.2 1.3.6 1.8 1.8 1.2 16.3-8.6 33.1-15.6 33.1-37.1C92 44.3 78.2 32 60 32z"
+              />
+            </svg>
             <svg v-else viewBox="0 0 120 120" width="72" height="72">
               <rect width="120" height="120" rx="24" fill="#334155" />
             </svg>
           </div>
           <p class="help" style="margin: 0.75rem 0">
             {{ integrationHelp(item) }}
-            <span v-if="integrationConfigured(item)" class="ok-inline"> · Webhook saved</span>
+            <span v-if="integrationConfigured(item)" class="ok-inline"> · {{ configuredLabel(item) }}</span>
           </p>
           <button class="btn btn-primary" type="button" style="width: 100%" @click="openIntegrationConfig(item)">
             Configure
@@ -346,7 +398,7 @@ async function testIntegration(item: SettingsIntegration) {
             class="btn"
             type="button"
             style="width: 100%; margin-top: 0.4rem"
-            :disabled="testingIntegration === item.id || !item.config.enabled || !integrationConfigured(item)"
+            :disabled="testingIntegration === item.id || !item.config.enabled || !integrationTestReady(item)"
             @click="testIntegration(item)"
           >
             {{ testingIntegration === item.id ? 'Sending…' : 'Send test message' }}
@@ -373,6 +425,15 @@ async function testIntegration(item: SettingsIntegration) {
       </table>
     </div>
   </section>
+
+  <LineConfigModal
+    v-if="configuringLine && lineItem"
+    :settings="settings"
+    :item="lineItem"
+    :save="save"
+    :saving="saving"
+    @close="closeLineConfig"
+  />
 
   <IntegrationConfigModal
     v-if="configuring"

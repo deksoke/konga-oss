@@ -36,11 +36,12 @@ const showAddTarget = ref(false)
 const targetSearch = ref('')
 const rawTarget = ref<KongTarget | null>(null)
 const form = reactive<UpstreamFormModel>(emptyUpstreamForm())
-const alert = ref<{ active: boolean; email: boolean; slack: boolean; discord: boolean }>({
+const alert = ref<{ active: boolean; email: boolean; slack: boolean; discord: boolean; line: boolean }>({
   active: false,
   email: false,
   slack: true,
-  discord: true
+  discord: true,
+  line: true
 })
 const alertSaving = ref(false)
 
@@ -101,16 +102,17 @@ async function load() {
 async function loadAlert() {
   try {
     const res = await $fetch<{
-      data: { active: boolean; email: boolean; slack: boolean; discord: boolean }
+      data: { active: boolean; email: boolean; slack: boolean; discord: boolean; line: boolean }
     }>(`/api/upstream-alerts/${route.params.id}`)
     alert.value = {
       active: Boolean(res.data?.active),
       email: Boolean(res.data?.email),
       slack: res.data?.slack !== false,
-      discord: res.data?.discord !== false
+      discord: res.data?.discord !== false,
+      line: res.data?.line !== false
     }
   } catch {
-    alert.value = { active: false, email: false, slack: true, discord: true }
+    alert.value = { active: false, email: false, slack: true, discord: true, line: true }
   }
 }
 
@@ -118,7 +120,7 @@ async function saveAlert() {
   alertSaving.value = true
   try {
     const res = await $fetch<{
-      data: { active: boolean; email: boolean; slack: boolean; discord: boolean }
+      data: { active: boolean; email: boolean; slack: boolean; discord: boolean; line: boolean }
     }>(`/api/upstream-alerts/${route.params.id}`, {
       method: 'PUT',
       body: alert.value
@@ -127,7 +129,8 @@ async function saveAlert() {
       active: Boolean(res.data.active),
       email: Boolean(res.data.email),
       slack: Boolean(res.data.slack),
-      discord: Boolean(res.data.discord)
+      discord: Boolean(res.data.discord),
+      line: Boolean(res.data.line)
     }
     useNotify().success(alert.value.active ? 'Upstream alerts enabled' : 'Upstream alerts disabled')
   } catch (e: any) {
@@ -393,6 +396,10 @@ watch(() => route.params.id, load)
             <label class="row" style="gap: 0.5rem">
               <input v-model="alert.discord" type="checkbox" :disabled="!alert.active" />
               <span>Notify via Discord (uses Settings integrations)</span>
+            </label>
+            <label class="row" style="gap: 0.5rem">
+              <input v-model="alert.line" type="checkbox" :disabled="!alert.active" />
+              <span>Notify via LINE (uses Settings integrations)</span>
             </label>
             <label class="row" style="gap: 0.5rem">
               <input v-model="alert.email" type="checkbox" :disabled="!alert.active" />

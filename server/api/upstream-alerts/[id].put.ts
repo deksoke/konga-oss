@@ -6,7 +6,8 @@ const bodySchema = z.object({
   active: z.boolean().optional(),
   email: z.boolean().optional(),
   slack: z.boolean().optional(),
-  discord: z.boolean().optional()
+  discord: z.boolean().optional(),
+  line: z.boolean().optional()
 })
 
 export default defineEventHandler(async (event) => {
@@ -43,13 +44,15 @@ export default defineEventHandler(async (event) => {
       active: body.active ?? false,
       email: body.email ?? false,
       slack: body.slack ?? true,
-      discord: body.discord ?? true
+      discord: body.discord ?? true,
+      line: body.line ?? true
     },
     update: {
       ...(body.active !== undefined ? { active: body.active } : {}),
       ...(body.email !== undefined ? { email: body.email } : {}),
       ...(body.slack !== undefined ? { slack: body.slack } : {}),
-      ...(body.discord !== undefined ? { discord: body.discord } : {})
+      ...(body.discord !== undefined ? { discord: body.discord } : {}),
+      ...(body.line !== undefined ? { line: body.line } : {})
     }
   })
 

@@ -80,6 +80,11 @@ export type AppSettingsData = {
         required?: boolean
         value: string
       }>
+      line_send_mode?: 'followers' | 'rooms' | 'users'
+      line_selected_room_ids?: string[]
+      line_selected_user_ids?: string[]
+      line_known_rooms?: Array<{ id: string; name: string; kind: 'group' | 'room' }>
+      line_known_users?: Array<{ id: string; name: string }>
       [key: string]: unknown
     }
   }>
@@ -191,6 +196,36 @@ export const DEFAULT_SETTINGS: AppSettingsData = {
           }
         ],
         discord_webhook_url: ''
+      }
+    },
+    {
+      id: 'line',
+      name: 'LINE Official',
+      config: {
+        enabled: false,
+        fields: [
+          {
+            id: 'line_channel_access_token',
+            name: 'Channel Access Token',
+            type: 'password',
+            required: true,
+            value: ''
+          },
+          {
+            id: 'line_channel_secret',
+            name: 'Channel Secret',
+            type: 'password',
+            required: true,
+            value: ''
+          }
+        ],
+        line_channel_access_token: '',
+        line_channel_secret: '',
+        line_send_mode: 'rooms',
+        line_selected_room_ids: [],
+        line_selected_user_ids: [],
+        line_known_rooms: [],
+        line_known_users: []
       }
     }
   ],
@@ -320,6 +355,72 @@ export function applyOAuthProvidersUpdate(
   return next
 }
 
+function asStringList(raw: unknown, cap?: number): string[] {
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    const id = String(item || '').trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+    if (cap && out.length >= cap) break
+  }
+  return out
+}
+
+function asKnownRooms(raw: unknown): Array<{ id: string; name: string; kind: 'group' | 'room' }> {
+  if (!Array.isArray(raw)) return []
+  const out: Array<{ id: string; name: string; kind: 'group' | 'room' }> = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as { id?: unknown; name?: unknown; kind?: unknown }
+    const id = String(row.id || '').trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push({
+      id,
+      name: String(row.name || id).trim() || id,
+      kind: row.kind === 'room' ? 'room' : 'group'
+    })
+  }
+  return out
+}
+
+function asKnownUsers(raw: unknown): Array<{ id: string; name: string }> {
+  if (!Array.isArray(raw)) return []
+  const out: Array<{ id: string; name: string }> = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as { id?: unknown; name?: unknown }
+    const id = String(row.id || '').trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push({ id, name: String(row.name || id).trim() || id })
+  }
+  return out
+}
+
+function mergeLineExtras(
+  defConfig: AppSettingsData['integrations'][number]['config'],
+  foundConfig: AppSettingsData['integrations'][number]['config'] | undefined
+) {
+  const mode = foundConfig?.line_send_mode
+  return {
+    line_send_mode: mode === 'followers' || mode === 'users' || mode === 'rooms' ? mode : defConfig.line_send_mode || 'rooms',
+    line_selected_room_ids: foundConfig
+      ? asStringList(foundConfig.line_selected_room_ids, 20)
+      : asStringList(defConfig.line_selected_room_ids, 20),
+    line_selected_user_ids: foundConfig
+      ? asStringList(foundConfig.line_selected_user_ids)
+      : asStringList(defConfig.line_selected_user_ids),
+    line_known_rooms: foundConfig ? asKnownRooms(foundConfig.line_known_rooms) : asKnownRooms(defConfig.line_known_rooms),
+    line_known_users: foundConfig ? asKnownUsers(foundConfig.line_known_users) : asKnownUsers(defConfig.line_known_users)
+  }
+}
+
 function mergeIntegrations(raw: unknown): AppSettingsData['integrations'] {
   const base = structuredClone(DEFAULT_SETTINGS.integrations)
   if (!Array.isArray(raw) || !raw.length) return base
@@ -335,7 +436,8 @@ function mergeIntegrations(raw: unknown): AppSettingsData['integrations'] {
     const config: AppSettingsData['integrations'][number]['config'] = {
       ...def.config,
       enabled: Boolean(found.config?.enabled),
-      fields
+      fields,
+      ...(def.id === 'line' ? mergeLineExtras(def.config, found.config) : {})
     }
     for (const field of fields) {
       config[field.id] = field.value

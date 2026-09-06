@@ -122,6 +122,7 @@ model UpstreamAlert {
   email        Boolean  @default(false)
   slack        Boolean  @default(true)
   discord      Boolean  @default(true)
+  line         Boolean  @default(true)
   data         Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
