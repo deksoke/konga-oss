@@ -15,7 +15,9 @@ COPY . .
 RUN rm -f .env .env.* || true
 ENV NUXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-RUN npx prisma generate && npm run build \
+ARG BUILD_DATE
+RUN export NUXT_PUBLIC_BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" \
+  && npx prisma generate && npm run build \
   && npm prune --omit=dev \
   && npm cache clean --force
 

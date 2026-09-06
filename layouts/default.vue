@@ -2,10 +2,13 @@
 import type { NavIconName } from '~/components/NavIcon.vue'
 import NavIcon from '~/components/NavIcon.vue'
 import ThemePicker from '~/components/ThemePicker.vue'
+import { formatBuildDate } from '~/utils/formatBuildDate'
 
 const { user, logout, refresh } = useAuth()
 const { nodes, refreshConnectionNodes } = useConnectionNodes()
 const route = useRoute()
+const runtimeConfig = useRuntimeConfig()
+const buildDateLabel = computed(() => formatBuildDate(String(runtimeConfig.public.buildDate || '')))
 const error = ref('')
 const sidebarOpen = ref(true)
 const isMobile = ref(false)
@@ -167,6 +170,7 @@ async function onLogout() {
           <span class="muted" style="font-size: 0.8rem">{{ user.role }} · Profile</span>
         </NuxtLink>
         <button class="btn" type="button" @click="onLogout">Logout</button>
+        <p v-if="buildDateLabel" class="muted" style="font-size: 0.8rem">{{ buildDateLabel }}</p>
       </div>
     </aside>
 
