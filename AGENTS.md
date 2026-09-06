@@ -5,7 +5,7 @@
 - หน้าที่สั้นๆ: KONG Admin UI Management สำหรับตั้งค่าคอนฟิค Kong API Gateway
 
 ## Stack
-- TypeScript / Nuxt 3 / PostgreSQL:
+- TypeScript / Nuxt 3 / PostgreSQL
 
 ## โครงสร้างหลัก
 - `/` —
@@ -13,7 +13,6 @@
 
 ## คำสั่ง
 - เทส: npm run test
-- lint:
 - dev server: npm run dev
 
 ## Git
