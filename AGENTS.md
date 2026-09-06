@@ -23,10 +23,9 @@
 - ห้าม commit หรือเปิด MR ถ้าผู้ใช้ไม่ได้สั่ง
 
 ## การติดตามงาน
-- tracker: GitHub | GitLab
+- tracker: GitHub
 - คำสั่งสร้าง issue:
   - GitHub: `gh issue create --title "..." --body "..."`
-  - GitLab: `glab issue create --title "..." --description "..."`
 - หลังอนุมัติแผน ให้ Agent หลักเปิด issue ด้วยคำสั่งของ tracker ที่เลือก ก่อนเรียก developer
 - เนื้อหา issue ใส่แผนและเกณฑ์ผ่าน แล้วส่งเลข issue ให้ developer
 - planner ห้ามเปิด issue
